@@ -11,3 +11,4 @@ coverage/
 uploads/
 .jira-import/
 seed/jira-*/
+__pycache__/
