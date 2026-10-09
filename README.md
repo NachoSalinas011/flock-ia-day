@@ -15,7 +15,7 @@ cp .env.example .env        # completar OPENROUTER_API_KEY
 npm install
 npm run db:up               # Postgres + pgvector en Docker (puerto 5433)
 npm run db:migrate
-npm run db:seed             # 2 proyectos cerrados con fuentes indexadas y propuesta formal
+npm run db:seed             # carga los proyectos históricos de seed/ (ver seed/README.md)
 npm run dev                 # API :3000 (Swagger en /api/docs) + web :5173
 ```
 

@@ -2,20 +2,156 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { NotebookStatus } from '@prisma/client';
+import { NotebookStatus, Prisma } from '@prisma/client';
+import { z } from 'zod';
 import { AppModule } from '../app.module';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProposalsRepository } from '../proposals/proposals.repository';
+import { detectSourceType } from '../sources/ingestion/text-extractor';
 import { RetrievalService } from '../sources/retrieval.service';
 import { SourcesService } from '../sources/sources.service';
 
+const DATA_FILE = 'estimacion.json';
+
+const hours = z.object({
+  UX: z.number().min(0).default(0),
+  FRONTEND: z.number().min(0).default(0),
+  BACKEND: z.number().min(0).default(0),
+  QA: z.number().min(0).default(0),
+});
+
+/** Shape of seed/<proyecto>/estimacion.json (documented in seed/README.md). */
+const historicalProjectSchema = z.object({
+  project: z.object({
+    code: z
+      .string()
+      .min(1, 'project.code es obligatorio y único (ej. "P-2025-07")'),
+    name: z.string().min(1),
+    client: z.string().optional(),
+    industry: z.string().optional(),
+    year: z.number().int().optional(),
+    summary: z.string().optional(),
+  }),
+  parameters: z
+    .object({
+      pmOverheadPct: z.number().min(0).max(50).default(15),
+      contingencyPct: z.number().min(0).max(50).default(10),
+    })
+    .default({}),
+  team: z
+    .array(
+      z.object({
+        role: z.enum(['PM', 'UX', 'FRONTEND', 'BACKEND', 'QA']),
+        seniority: z.enum(['JR', 'SSR', 'SR']),
+        count: z.number().int().min(1).default(1),
+        dedication: z.enum(['FT', 'PT']),
+      }),
+    )
+    .min(1, 'el equipo vendido no puede estar vacío'),
+  modules: z
+    .array(
+      z.object({
+        name: z.string().min(1),
+        description: z.string().default(''),
+        complexity: z.enum(['LOW', 'MEDIUM', 'HIGH']),
+        estimatedHours: hours,
+        actualHours: hours.nullable().default(null),
+        notes: z.string().nullable().default(null),
+        container: z.string().nullable().default(null),
+        integrations: z.array(z.string()).default([]),
+        dependsOn: z.array(z.string()).default([]),
+      }),
+    )
+    .min(1),
+  lessons: z.array(z.string()).default([]),
+  architecture: z
+    .object({
+      actors: z.array(
+        z.object({
+          key: z.string(),
+          name: z.string(),
+          description: z.string().default(''),
+          uses: z.array(z.string()).default([]),
+        }),
+      ),
+      containers: z.array(
+        z.object({
+          key: z.string(),
+          name: z.string(),
+          technology: z.string().default(''),
+          kind: z.enum(['WEB', 'MOBILE', 'API', 'WORKER', 'DATABASE']),
+          description: z.string().default(''),
+          calls: z.array(z.string()).default([]),
+        }),
+      ),
+      externalSystems: z
+        .array(
+          z.object({
+            key: z.string(),
+            name: z.string(),
+            description: z.string().default(''),
+          }),
+        )
+        .default([]),
+    })
+    .nullable()
+    .default(null),
+});
+
+type HistoricalProject = z.infer<typeof historicalProjectSchema>;
+
 /**
- * Loads the fictional closed projects from /seed as CLOSED notebooks:
- * their documents as indexed sources + their formal proposal with actual hours.
- * Idempotent: re-running replaces each project (matched by code).
+ * Loads closed historical projects from /seed as CLOSED notebooks: their
+ * documents as indexed sources + their formal (sold) proposal with actual hours.
+ * Folders starting with "_" (e.g. _plantilla) are ignored.
+ * Idempotent: re-running replaces each project (matched by project.code).
  */
 async function seed() {
   const logger = new Logger('Seed');
+  const seedDir = process.env.SEED_DIR ?? resolve(process.cwd(), '../../seed');
+  const folders = readdirSync(seedDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith('_'))
+    .map((entry) => join(seedDir, entry.name))
+    .sort();
+
+  // Validate everything before touching the database.
+  const projects: { folder: string; data: HistoricalProject }[] = [];
+  const errors: string[] = [];
+  for (const folder of folders) {
+    try {
+      const raw = JSON.parse(readFileSync(join(folder, DATA_FILE), 'utf8'));
+      const parsed = historicalProjectSchema.safeParse(raw);
+      if (parsed.success) {
+        projects.push({ folder, data: parsed.data });
+      } else {
+        errors.push(
+          ...parsed.error.issues.map(
+            (issue) =>
+              `${folder}/${DATA_FILE} → ${issue.path.join('.') || '(raíz)'}: ${issue.message}`,
+          ),
+        );
+      }
+    } catch (error) {
+      errors.push(
+        `${folder}/${DATA_FILE} → ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+  if (errors.length) {
+    errors.forEach((e) => logger.error(e));
+    logger.error(
+      'No se cargó nada: corregí los errores de arriba y volvé a correr el seed.',
+    );
+    process.exitCode = 1;
+    return;
+  }
+  if (!projects.length) {
+    logger.warn(
+      `No hay proyectos en ${seedDir} (las carpetas que empiezan con "_" se ignoran).`,
+    );
+    return;
+  }
+
   const app = await NestFactory.createApplicationContext(AppModule, {
     logger: ['error', 'warn', 'log'],
   });
@@ -23,17 +159,8 @@ async function seed() {
   const sources = app.get(SourcesService);
   const retrieval = app.get(RetrievalService);
   const proposals = app.get(ProposalsRepository);
-  const seedDir = process.env.SEED_DIR ?? resolve(process.cwd(), '../../seed');
 
-  const folders = readdirSync(seedDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => join(seedDir, entry.name))
-    .sort();
-
-  for (const folder of folders) {
-    const data = JSON.parse(
-      readFileSync(join(folder, 'estimacion.json'), 'utf8'),
-    );
+  for (const { folder, data } of projects) {
     const { project, parameters } = data;
 
     await prisma.notebook.deleteMany({ where: { code: project.code } });
@@ -50,7 +177,7 @@ async function seed() {
     });
 
     const documents = readdirSync(folder)
-      .filter((file) => file.endsWith('.md'))
+      .filter((file) => file !== DATA_FILE && detectSourceType(file))
       .sort();
     for (const file of documents) {
       await sources.ingestNow(
@@ -60,18 +187,15 @@ async function seed() {
       );
     }
 
-    // Link each module to the client documents (brief, kickoff) that describe it.
+    // Link each module to the documents that describe it best.
     const sourceChunkIds = await Promise.all(
-      data.modules.map(async (module: any) => {
+      data.modules.map(async (module) => {
         const hits = await retrieval.search(
           `${module.name}: ${module.description}`,
           [notebook.id],
-          10,
+          2,
         );
-        return hits
-          .filter((hit) => /^0[12]-/.test(hit.filename))
-          .slice(0, 2)
-          .map((hit) => hit.id);
+        return hits.map((hit) => hit.id);
       }),
     );
 
@@ -79,16 +203,21 @@ async function seed() {
     await proposals.createWithOptions(
       {
         notebookId: notebook.id,
-        summary: project.summary,
+        summary: project.summary ?? '',
         assumptions: [],
         outOfScope: [],
         risks: [],
         openQuestions: [],
         lessons: data.lessons,
         model: 'seed',
-        architecture: { ...data.architecture, inferred: false },
+        architecture: data.architecture
+          ? {
+              ...data.architecture,
+              inferred: false,
+            }
+          : Prisma.DbNull,
       },
-      data.modules.map((module: any, position: number) => ({
+      data.modules.map((module, position) => ({
         position,
         name: module.name,
         description: module.description,
@@ -96,7 +225,7 @@ async function seed() {
         confidence: 'HIGH',
         priority: 'MUST',
         estimatedHours: module.estimatedHours,
-        actualHours: module.actualHours,
+        actualHours: module.actualHours ?? Prisma.DbNull,
         notes: module.notes,
         containerKey: module.container,
         integrations: module.integrations,
@@ -110,7 +239,7 @@ async function seed() {
           pmOverheadPct: parameters.pmOverheadPct,
           contingencyPct: parameters.contingencyPct,
           team: data.team,
-          modules: data.modules.map((_: unknown, position: number) => ({
+          modules: data.modules.map((_, position) => ({
             position,
             variant: 'FULL' as const,
           })),

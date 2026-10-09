@@ -2,12 +2,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { calculateEstimation, EstimationInput } from './estimation.engine';
 
-const loadSeed = (folder: string) =>
+const loadFixture = (folder: string) =>
   JSON.parse(
-    readFileSync(
-      join(__dirname, '../../../../seed', folder, 'estimacion.json'),
-      'utf8',
-    ),
+    readFileSync(join(__dirname, '__fixtures__', `${folder}.json`), 'utf8'),
   );
 
 const toInput = (seed: any): EstimationInput => ({
@@ -18,8 +15,8 @@ const toInput = (seed: any): EstimationInput => ({
 });
 
 describe('calculateEstimation', () => {
-  it('reproduces the TurnoFácil formal proposal (no contingency)', () => {
-    const seed = loadSeed('proyecto-01-turnofacil');
+  it('reproduces a historical formal proposal without contingency', () => {
+    const seed = loadFixture('historico-sin-contingencia');
 
     const result = calculateEstimation(toInput(seed));
 
@@ -31,8 +28,8 @@ describe('calculateEstimation', () => {
     );
   });
 
-  it('reproduces the Portal B2B formal proposal (10% contingency)', () => {
-    const seed = loadSeed('proyecto-02-portal-b2b');
+  it('reproduces a historical formal proposal with 10% contingency', () => {
+    const seed = loadFixture('historico-con-contingencia');
 
     const result = calculateEstimation(toInput(seed));
 

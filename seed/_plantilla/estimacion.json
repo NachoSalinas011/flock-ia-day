@@ -1,0 +1,61 @@
+{
+  "project": {
+    "code": "P-2025-01",
+    "name": "Nombre del proyecto",
+    "client": "Nombre del cliente",
+    "industry": "Industria",
+    "year": 2025,
+    "summary": "Qué se construyó, para quién y con qué alcance, en 2 o 3 oraciones."
+  },
+  "parameters": {
+    "pmOverheadPct": 15,
+    "contingencyPct": 10
+  },
+  "team": [
+    { "role": "PM", "seniority": "SSR", "count": 1, "dedication": "PT" },
+    { "role": "UX", "seniority": "SSR", "count": 1, "dedication": "PT" },
+    { "role": "FRONTEND", "seniority": "SSR", "count": 1, "dedication": "FT" },
+    { "role": "BACKEND", "seniority": "SR", "count": 1, "dedication": "FT" },
+    { "role": "QA", "seniority": "SSR", "count": 1, "dedication": "PT" }
+  ],
+  "modules": [
+    {
+      "name": "Autenticación y gestión de usuarios",
+      "description": "Qué incluía el módulo (funcionalidades concretas).",
+      "complexity": "MEDIUM",
+      "estimatedHours": { "UX": 12, "FRONTEND": 32, "BACKEND": 40, "QA": 16 },
+      "actualHours": { "UX": 12, "FRONTEND": 30, "BACKEND": 44, "QA": 14 },
+      "notes": "Por qué se desvió (o no) respecto de lo estimado.",
+      "container": "api",
+      "integrations": [],
+      "dependsOn": []
+    },
+    {
+      "name": "Integración con sistema externo",
+      "description": "Qué se integró y cómo (API, SOAP, archivos, etc.).",
+      "complexity": "HIGH",
+      "estimatedHours": { "UX": 0, "FRONTEND": 0, "BACKEND": 120, "QA": 32 },
+      "actualHours": { "UX": 0, "FRONTEND": 0, "BACKEND": 168, "QA": 44 },
+      "notes": "Ej.: documentación incompleta y sin ambiente de testing.",
+      "container": "api",
+      "integrations": ["erp"],
+      "dependsOn": ["Autenticación y gestión de usuarios"]
+    }
+  ],
+  "lessons": [
+    "Lección aprendida que el estimador debería aplicar en el futuro."
+  ],
+  "architecture": {
+    "actors": [
+      { "key": "cliente", "name": "Usuario final", "description": "Quién usa el sistema", "uses": ["web"] }
+    ],
+    "containers": [
+      { "key": "web", "name": "Aplicación web", "technology": "React", "kind": "WEB", "description": "Interfaz", "calls": ["api"] },
+      { "key": "api", "name": "API", "technology": "NestJS", "kind": "API", "description": "Lógica de negocio", "calls": ["db"] },
+      { "key": "db", "name": "Base de datos", "technology": "PostgreSQL", "kind": "DATABASE", "description": "Persistencia", "calls": [] }
+    ],
+    "externalSystems": [
+      { "key": "erp", "name": "ERP del cliente", "description": "Sistema externo integrado" }
+    ]
+  }
+}
