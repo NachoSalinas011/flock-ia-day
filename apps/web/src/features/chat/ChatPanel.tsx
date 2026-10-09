@@ -138,11 +138,15 @@ function Message({ message, onCitation }: { message: ChatMessage; onCitation: (c
       <div className="prose-chat text-text-soft">
         <Markdown
           remarkPlugins={[remarkGfm]}
+          // LLM output may carry content injected through the sources: never load images
+          // (a URL could exfiltrate data) and only turn our own citation markers into links
+          disallowedElements={['img']}
+          unwrapDisallowed
           components={{
             a: ({ href, children }) => {
               const index = href?.startsWith('#cite-') ? Number(href.slice(6)) : null
               const cite = index ? byIndex.get(index) : undefined
-              if (!cite) return <a href={href}>{children}</a>
+              if (!cite) return <span className="underline decoration-dotted" title={href}>{children}</span>
               return (
                 <button
                   type="button"

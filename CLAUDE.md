@@ -14,7 +14,7 @@ Monorepo con npm workspaces (`apps/api` = `@estimador/api`, `apps/web` = `@estim
 npm run db:up                 # Postgres 16 + pgvector en Docker (puerto 5433)
 npm run db:migrate            # prisma migrate dev
 npm run db:seed               # nest build + carga los históricos de seed/ (valida todo antes de escribir)
-npm run dev                   # API :3000 (Swagger /api/docs) + web :5173 (Vite proxea /api)
+npm run dev                   # API 127.0.0.1:3000 (Swagger /api/docs) + web :5173 (Vite proxea /api a 127.0.0.1)
 
 # API (cd apps/api)
 npx jest                                        # tests (motor de estimación, planner, días hábiles)
@@ -39,9 +39,9 @@ OpenRouter con modelos `:free` (~50 pedidos/día). **No llames a `POST /notebook
 ### Backend (`apps/api/src`, NestJS + Prisma)
 Capas estrictas **Controller → Service → Repository → Prisma**; solo los repositories tocan `PrismaService` (excepciones: `seed/seed.ts`, `RetrievalService.closedNotebookIds`). DTOs con class-validator (`ValidationPipe` con whitelist + forbidNonWhitelisted); respuestas armadas por `*Mapper`. Prisma usa un único `prisma/schema.prisma`; la columna `Chunk.embedding` es `vector(384)` y se escribe/consulta con SQL crudo en `sources.repository.ts`.
 
-- **`llm/`**: único punto de acceso a OpenRouter (lista de modelos con fallback, caché, mock, reintento ante respuesta vacía). No mandar `response_format` (rompe a Nemotron); la salida se parsea y valida con zod.
+- **`llm/`**: único punto de acceso a OpenRouter (lista de modelos con fallback, caché, mock, reintento ante respuesta vacía). No mandar `response_format` (rompe a Nemotron); la salida se parsea y valida con zod. **Todo texto no confiable que entre a un prompt** (fuentes, histórico, indicaciones, preguntas) va dentro de bloques delimitados (`<fuentes_del_cliente>`, `<historico>`, `<contexto>`…) y pasa por `neutralizePromptTags` (`llm/prompt-safety.ts`).
 - **`embeddings/`**: `transformers.js` local (`multilingual-e5-small`, prefijos `query:`/`passage:`), sin cuota.
-- **`sources/`**: ingesta asíncrona (fire-and-forget; al iniciar la API se marcan como ERROR las que quedaron PENDING/PROCESSING), chunking por secciones markdown, búsqueda vectorial en `RetrievalService`.
+- **`sources/`**: ingesta asíncrona en una cola en memoria que procesa de a una fuente (al iniciar la API se marcan como ERROR las que quedaron PENDING/PROCESSING), chunking por secciones markdown, búsqueda vectorial en `RetrievalService`. Los topes de tamaño, páginas de PDF, expansión de DOCX (zip bombs), caracteres y chunks por fuente están en `sources/ingestion/limits.ts`.
 - **`proposals/`**: el corazón.
   - Una generación = **una** llamada al LLM (`proposal-generator.service.ts` + `proposal.prompt.ts` + `proposal.schema.ts`) que devuelve un **catálogo de módulos** (prioridad MUST/SHOULD/COULD, variante reducida opcional, horas por rol, analogías con el histórico, citas a chunks, arquitectura C4, equipo por opción, fecha objetivo).
   - Con ese catálogo, código determinístico arma **tres opciones** (`ProposalOption`: MVP / BALANCED "Equilibrada" / COMPLETE) en `estimation/scope-planner.ts`: MVP = MUST reducidos; Equilibrada = MUST + SHOULD que entran en la fecha objetivo; Completa = todo.
@@ -55,15 +55,18 @@ Capas estrictas **Controller → Service → Repository → Prisma**; solo los r
   - Fechas: todo en UTC solo-fecha (`business-days.ts`); "hoy" es el día local guardado como medianoche UTC.
 - **Histórico** = notebooks `CLOSED` con una única opción formal (COMPLETE) y `actualHours`. `loadHistory` en el generator los manda al LLM como calibración. Se cargan solo con el seed.
 
+- **Exposición**: `main.ts` escucha en `API_HOST` (default `127.0.0.1`) y CORS solo acepta `WEB_ORIGIN` (default `http://localhost:5173`); body JSON hasta 1 MB.
+
 ### Frontend (`apps/web/src`, React 19 + TanStack Query + Tailwind v4)
 - Capas: `lib/api.ts` (cliente) → `hooks/` (TanStack Query) → `features/` → `pages/`. Estilo: comillas simples, sin punto y coma (no correr prettier con config default).
 - Design system Flock: tokens como CSS vars en `index.css` (`--brand`, `--surface`, estados `--state-*`), clases utilitarias `.btn`, `.chip`, `.card`, `.data-table`; dark mode con `html.dark`.
 - `NotebookPage` mantiene la selección compartida (versión + opción) con `useSelectedProposal` y la mutación de generar (para que sobreviva al cambio de pestaña). Las mutaciones devuelven la propuesta completa y reemplazan el caché (`useProposalMutation`).
 - Pestañas: Comparativa (`features/comparison`), Propuesta, Módulos identificados (`features/modules`: C4 con React Flow, layout determinístico en `c4Layout.ts`, modo diferencias, PDF con `@react-pdf/renderer`) y Chat.
 - `lib/moduleDiff.ts` compara opciones/versiones en el cliente (match por id dentro de la misma versión; por nombre/analogía entre versiones).
+- El chat renderiza la salida del LLM con react-markdown **sin imágenes** y sin links externos: solo los marcadores `#cite-N` se vuelven clicables (evita exfiltración por prompt injection indirecto).
 
 ## Datos
 
 - `seed/<proyecto>/estimacion.json` + documentos = un histórico; formato documentado en `seed/README.md`, plantilla en `seed/_plantilla/` (las carpetas con `_` se ignoran). El seed es idempotente por `project.code`.
-- `seed/jira-*/` y `.jira-import/` contienen datos reales (anonimizados) de un cliente: están en `.gitignore`, no commitearlos.
+- `seed/jira-*/` y `.jira-import/` contienen datos reales (anonimizados) de un cliente: están en `.gitignore`, no commitearlos. `scripts/jira-to-seed.py` anonimiza nombres configurados y reemplaza URLs, dominios, emails y menciones por `[enlace]`/`[email]`/`[persona]`; requiere Python ≥ 3.12.
 - Los tests del motor usan `apps/api/src/estimation/__fixtures__/`, no `seed/`.

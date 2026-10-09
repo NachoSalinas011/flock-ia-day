@@ -1,4 +1,5 @@
 import { LlmMessage } from '../llm/llm.service';
+import { neutralizePromptTags } from '../llm/prompt-safety';
 
 export const CHAT_SYSTEM_PROMPT = `Sos un asistente de preventa de una consultora de software. Respondés preguntas sobre una oportunidad comercial usando EXCLUSIVAMENTE el contexto provisto: fuentes del cliente, proyectos históricos del equipo y la propuesta vigente.
 
@@ -22,17 +23,20 @@ export function buildChatMessages(params: {
   question: string;
 }): LlmMessage[] {
   const context = params.context
-    .map((c) => `[${c.index}] ${c.label}\n${c.content}`)
+    .map(
+      (c) =>
+        `[${c.index}] ${neutralizePromptTags(c.label)}\n${neutralizePromptTags(c.content)}`,
+    )
     .join('\n\n---\n\n');
   const proposal = params.proposalSummary
-    ? `\n\n## Propuesta vigente (sin número de referencia)\n${params.proposalSummary}`
+    ? `\n\n## Propuesta vigente (sin número de referencia)\n${neutralizePromptTags(params.proposalSummary)}`
     : '';
   return [
     { role: 'system', content: CHAT_SYSTEM_PROMPT },
     ...params.history,
     {
       role: 'user',
-      content: `## Contexto\n<contexto>\n${context || '(sin fuentes cargadas)'}${proposal}\n</contexto>\n\n## Pregunta\n${params.question}`,
+      content: `## Contexto\n<contexto>\n${context || '(sin fuentes cargadas)'}${proposal}\n</contexto>\n\n## Pregunta\n${neutralizePromptTags(params.question)}`,
     },
   ];
 }

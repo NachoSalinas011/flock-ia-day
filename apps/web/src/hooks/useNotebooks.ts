@@ -28,6 +28,10 @@ export function useDeleteNotebook() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: api.notebooks.remove,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: notebookKeys.all }),
+    // drop the deleted notebook's own query (refetching it would 404) and refresh the lists
+    onSuccess: (_, id) => {
+      queryClient.removeQueries({ queryKey: notebookKeys.detail(id), exact: true })
+      return queryClient.invalidateQueries({ queryKey: ['notebooks', 'list'] })
+    },
   })
 }

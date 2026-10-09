@@ -1,15 +1,16 @@
 import clsx from 'clsx'
-import { ArrowLeft, Boxes, Columns3, Lock, MessageSquare, Sparkles } from 'lucide-react'
+import { ArrowLeft, Boxes, Columns3, Lock, MessageSquare, Sparkles, Trash2 } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ErrorBanner, Spinner } from '../components/Feedback'
+import { Modal } from '../components/Modal'
 import { ChatPanel } from '../features/chat/ChatPanel'
 import { ComparisonPanel } from '../features/comparison/ComparisonPanel'
 import { ModulesPanel } from '../features/modules/ModulesPanel'
 import { ProposalPanel } from '../features/proposals/ProposalPanel'
 import type { Generation } from '../features/proposals/GenerateProposal'
 import { SourcesPanel } from '../features/sources/SourcesPanel'
-import { useNotebook } from '../hooks/useNotebooks'
+import { useDeleteNotebook, useNotebook } from '../hooks/useNotebooks'
 import { useGenerateProposal } from '../hooks/useProposals'
 import { useSelectedProposal } from '../hooks/useSelectedProposal'
 import { useSources } from '../hooks/useSources'
@@ -23,6 +24,9 @@ export function NotebookPage() {
   const [chosenTab, setTab] = useState<Tab | null>(null)
   const selection = useSelectedProposal(id)
   const [chatDraft, setChatDraft] = useState<string | null>(null)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const deleteNotebook = useDeleteNotebook()
+  const navigate = useNavigate()
   const generate = useGenerateProposal(id)
   const generation: Generation = {
     isPending: generate.isPending,
@@ -67,7 +71,53 @@ export function NotebookPage() {
             <Lock size={11} /> Proyecto cerrado
           </span>
         )}
+        <button
+          type="button"
+          className="btn ml-auto shrink-0 text-white"
+          style={{ background: 'rgba(255,255,255,.14)' }}
+          onClick={() => setConfirmingDelete(true)}
+          aria-label={closed ? 'Eliminar proyecto' : 'Eliminar oportunidad'}
+        >
+          <Trash2 size={15} /> Eliminar
+        </button>
       </header>
+
+      {confirmingDelete && (
+        <Modal
+          title={`Eliminar ${closed ? 'proyecto' : 'oportunidad'}`}
+          onClose={() => !deleteNotebook.isPending && setConfirmingDelete(false)}
+          footer={
+            <>
+              <button type="button" className="btn btn-ghost" disabled={deleteNotebook.isPending} onClick={() => setConfirmingDelete(false)}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn text-white"
+                style={{ background: 'var(--state-blocked-fg)' }}
+                disabled={deleteNotebook.isPending}
+                onClick={() =>
+                  deleteNotebook.mutate(id, { onSuccess: () => navigate(closed ? '/historico' : '/', { replace: true }) })
+                }
+              >
+                <Trash2 size={15} /> {deleteNotebook.isPending ? 'Eliminando…' : 'Eliminar'}
+              </button>
+            </>
+          }
+        >
+          <p className="text-[13.5px] text-text-soft">
+            Se elimina <b className="text-text">{notebook.name}</b> con todas sus fuentes, el chat y todas las versiones de propuestas. No se puede
+            deshacer.
+          </p>
+          {closed && (
+            <p className="chip-pending rounded-lg px-3 py-2 text-[12.5px]">
+              Deja de usarse para calibrar las próximas estimaciones. Si viene del seed, vuelve a aparecer al correr{' '}
+              <code className="text-mono">npm run db:seed</code>.
+            </p>
+          )}
+          <ErrorBanner error={deleteNotebook.error} />
+        </Modal>
+      )}
 
       <div className="flex min-h-0 flex-1">
         <SourcesPanel notebookId={id} readOnly={closed} />

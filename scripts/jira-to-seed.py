@@ -71,11 +71,23 @@ for name in issue_names:
 replacements.sort(key=lambda r: -len(r[0]))
 
 
+URL_RE = re.compile(r'(?:https?://|www\.)[^\s<>()\[\]"\']+', re.IGNORECASE)
+DOMAIN_RE = re.compile(r'(?<![\w@])[\w-]+(?:\.[\w-]+)*\.(?:com|net|org|io|ai|app|video|ar|cl|co|dev|cloud)(?:/[^\s<>()]*)?\b', re.IGNORECASE)
+EMAIL_RE = re.compile(r'[\w.+-]+@[\w-]+(?:\.[\w-]+)+')
+MENTION_RE = re.compile(r'\[~(?:accountid:)?[^\]]+\]|@[A-Za-zÁÉÍÓÚáéíóúÑñ]+(?:\s[A-Z][a-záéíóúñ]+)?', re.IGNORECASE)
+
+
 def anon(text):
+    """Removes links, emails, Jira mentions and configured names (client, people)."""
     if not text:
         return ''
+    text = URL_RE.sub('[enlace]', text)
+    text = EMAIL_RE.sub('[email]', text)
+    text = DOMAIN_RE.sub('[enlace]', text)
+    text = MENTION_RE.sub('[persona]', text)
     for word, repl in replacements:
-        text = re.sub(re.escape(word), repl, text, flags=re.IGNORECASE)
+        # whole words only, so short names don't break other words
+        text = re.sub(rf'(?<!\w){re.escape(word)}(?!\w)', repl, text, flags=re.IGNORECASE)
     return text
 
 

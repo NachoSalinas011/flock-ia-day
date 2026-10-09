@@ -10,7 +10,8 @@ import { EmbeddingsService } from '../embeddings/embeddings.service';
 import { NotebooksService } from '../notebooks/notebooks.service';
 import { CreateTextSourceDto } from './dto/create-text-source.dto';
 import { SourceResponseDto } from './dto/source-response.dto';
-import { chunkSegments } from './ingestion/chunker';
+import { chunkSegments, TextSegment } from './ingestion/chunker';
+import { INGESTION_LIMITS } from './ingestion/limits';
 import {
   detectSourceType,
   extractSegments,
@@ -30,6 +31,8 @@ const INTERRUPTED_MESSAGE =
 @Injectable()
 export class SourcesService implements OnModuleInit {
   private readonly logger = new Logger(SourcesService.name);
+  /** Sources are processed one at a time so a burst of uploads can't saturate CPU/memory. */
+  private queue: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly repository: SourcesRepository,
@@ -74,7 +77,7 @@ export class SourcesService implements OnModuleInit {
           type,
           filename: Buffer.from(file.originalname, 'latin1').toString('utf8'),
         });
-        void this.process(source.id, notebookId, type, file.buffer);
+        void this.enqueue(source.id, notebookId, type, file.buffer);
         return source;
       }),
     );
@@ -91,7 +94,7 @@ export class SourcesService implements OnModuleInit {
       type: SourceType.TEXT,
       filename: dto.title,
     });
-    void this.process(
+    void this.enqueue(
       source.id,
       notebookId,
       SourceType.TEXT,
@@ -108,7 +111,7 @@ export class SourcesService implements OnModuleInit {
   ): Promise<void> {
     const type = detectSourceType(filename) ?? SourceType.TEXT;
     const source = await this.repository.create({ notebookId, type, filename });
-    await this.process(source.id, notebookId, type, buffer);
+    await this.enqueue(source.id, notebookId, type, buffer);
   }
 
   async findByNotebook(notebookId: string): Promise<SourceResponseDto[]> {
@@ -129,6 +132,19 @@ export class SourcesService implements OnModuleInit {
     await this.repository.delete(id);
   }
 
+  private enqueue(
+    sourceId: string,
+    notebookId: string,
+    type: SourceType,
+    buffer: Buffer,
+  ): Promise<void> {
+    const run = this.queue.then(() =>
+      this.process(sourceId, notebookId, type, buffer),
+    );
+    this.queue = run.catch(() => undefined);
+    return run;
+  }
+
   private async process(
     sourceId: string,
     notebookId: string,
@@ -138,14 +154,27 @@ export class SourcesService implements OnModuleInit {
     const startedAt = Date.now();
     try {
       await this.repository.updateStatus(sourceId, SourceStatus.PROCESSING);
-      const segments = await extractSegments(type, buffer);
+      const segments = truncateSegments(
+        await extractSegments(type, buffer),
+        INGESTION_LIMITS.maxSourceChars,
+        () =>
+          this.logger.warn(
+            `Fuente ${sourceId}: texto truncado a ${INGESTION_LIMITS.maxSourceChars} caracteres`,
+          ),
+      );
       const rawText = segments
         .map((s) => s.text)
         .join('\n\n')
         .trim();
       if (!rawText) throw new Error('No se pudo extraer texto del archivo.');
 
-      const chunks = chunkSegments(segments);
+      const allChunks = chunkSegments(segments);
+      const chunks = allChunks.slice(0, INGESTION_LIMITS.maxChunks);
+      if (allChunks.length > chunks.length) {
+        this.logger.warn(
+          `Fuente ${sourceId}: se indexan ${chunks.length} de ${allChunks.length} fragmentos`,
+        );
+      }
       const vectors = await this.embeddings.embedPassages(
         chunks.map((c) => c.content),
       );
@@ -170,4 +199,25 @@ export class SourcesService implements OnModuleInit {
         .catch((e) => this.logger.error(`No se pudo marcar el error: ${e}`));
     }
   }
+}
+
+/** Keeps at most `maxChars` characters across segments (in order). */
+function truncateSegments(
+  segments: TextSegment[],
+  maxChars: number,
+  onTruncate: () => void,
+): TextSegment[] {
+  const kept: TextSegment[] = [];
+  let remaining = maxChars;
+  for (const segment of segments) {
+    if (remaining <= 0) break;
+    kept.push(
+      segment.text.length > remaining
+        ? { ...segment, text: segment.text.slice(0, remaining) }
+        : segment,
+    );
+    remaining -= segment.text.length;
+  }
+  if (remaining < 0 || kept.length < segments.length) onTruncate();
+  return kept;
 }

@@ -29,7 +29,7 @@ import {
 } from './dto/source-response.dto';
 import { SourcesService } from './sources.service';
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024;
+import { INGESTION_LIMITS } from './ingestion/limits';
 
 @ApiTags('sources')
 @Controller()
@@ -38,7 +38,9 @@ export class SourcesController {
 
   @Post('notebooks/:notebookId/sources')
   @UseInterceptors(
-    FilesInterceptor('files', 10, { limits: { fileSize: MAX_FILE_SIZE } }),
+    FilesInterceptor('files', INGESTION_LIMITS.maxFilesPerUpload, {
+      limits: { fileSize: INGESTION_LIMITS.maxFileSizeBytes },
+    }),
   )
   @ApiOperation({
     summary: 'Subir fuentes (md, txt, pdf, docx); se procesan en segundo plano',

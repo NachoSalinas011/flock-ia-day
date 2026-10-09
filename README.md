@@ -4,7 +4,7 @@
 
 ## Funcionalidades
 
-- **Oportunidades**: fuentes en md, txt, pdf o docx, indexadas localmente para RAG.
+- **Oportunidades**: fuentes en md, txt, pdf o docx (hasta 5 archivos de 15 MB por subida), indexadas localmente para RAG. Se pueden eliminar desde el encabezado, con confirmación.
 - **Chat** con citas a las fuentes propias y a los proyectos históricos.
 - **Comparativa**: una generación del LLM arma un catálogo de módulos y, con él, tres opciones:
   - **MVP**: lo indispensable (módulos MUST, en versión reducida si la tienen).
@@ -48,6 +48,8 @@ cd apps/web && npx tsc -b && npx eslint src
 | `DATABASE_URL` | Postgres del docker compose |
 | `LLM_MOCK=true` | Respuestas de ejemplo sin llamar al modelo (para desarrollar la UI) |
 | `LLM_CACHE=false` | Desactiva la caché de respuestas en `apps/api/.cache/llm` |
+| `API_HOST` | Interfaz donde escucha la API (default `127.0.0.1`, solo local; `0.0.0.0` para exponerla en la red) |
+| `WEB_ORIGIN` | Orígenes permitidos por CORS, separados por coma (default `http://localhost:5173`) |
 
 **Cuota:** las cuentas free tienen ~50 pedidos/día. Generar propuestas y el chat gastan 1 pedido cada uno; las respuestas válidas se cachean (misma pregunta y mismas fuentes = 0 pedidos). "Nueva versión" vuelve a consultar al modelo. Cuota restante: `curl -s https://openrouter.ai/api/v1/key -H "Authorization: Bearer $OPENROUTER_API_KEY"`.
 
@@ -60,6 +62,14 @@ cd apps/web && npx tsc -b && npx eslint src
   - PM = % sobre desarrollo (default 15 %); contingencia = % sobre desarrollo + PM (default 10 %).
   - Duración = máximo de días entre roles (cuello de botella) × (1 + contingencia), en días hábiles.
 
+## Seguridad
+
+- La API escucha solo en localhost y CORS acepta solo el front: nadie en la misma red puede usarla ni gastar la cuota.
+- Las fuentes son datos, nunca instrucciones: se delimitan en el prompt y se neutralizan las etiquetas que podrían cerrar esos bloques.
+- El chat no carga imágenes ni links que devuelva el modelo.
+- La ingesta tiene topes de tamaño, páginas, expansión de DOCX, texto y fragmentos por fuente, y procesa de a una fuente.
+- Sin autenticación: pensado para uso local de una persona.
+
 ## Proyectos históricos
 
 - **Desde archivos**: una carpeta por proyecto en `seed/` con `estimacion.json` y documentos. Formato, campos y plantilla en [`seed/README.md`](seed/README.md) y `seed/_plantilla/`. `npm run db:seed` valida todo antes de cargar.
@@ -67,7 +77,7 @@ cd apps/web && npx tsc -b && npx eslint src
   ```bash
   python3 -I scripts/jira-to-seed.py .jira-import seed && npm run db:seed
   ```
-  `.jira-import/` y `seed/jira-*/` tienen datos de clientes y están en `.gitignore`.
+  El script anonimiza el cliente y las personas, y reemplaza links, emails y menciones. Requiere Python ≥ 3.12. `.jira-import/` y `seed/jira-*/` tienen datos de clientes y están en `.gitignore`.
 
 ## Próximos pasos
 

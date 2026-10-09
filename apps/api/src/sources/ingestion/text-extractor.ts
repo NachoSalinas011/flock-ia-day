@@ -2,6 +2,7 @@ import { extname } from 'node:path';
 import { SourceType } from '@prisma/client';
 import mammoth from 'mammoth';
 import { TextSegment } from './chunker';
+import { INGESTION_LIMITS, zipUncompressedSize } from './limits';
 
 export const SUPPORTED_EXTENSIONS: Record<string, SourceType> = {
   '.txt': 'TEXT',
@@ -24,6 +25,13 @@ export async function extractSegments(
     case 'MARKDOWN':
       return [{ text: buffer.toString('utf8') }];
     case 'DOCX': {
+      const expanded = zipUncompressedSize(buffer);
+      if (expanded === null) throw new Error('El archivo DOCX está dañado.');
+      if (expanded > INGESTION_LIMITS.maxDocxUncompressedBytes) {
+        throw new Error(
+          'El archivo DOCX es demasiado grande al descomprimirse.',
+        );
+      }
       const { value } = await mammoth.extractRawText({ buffer });
       return [{ text: value }];
     }
@@ -39,6 +47,7 @@ async function extractPdfPages(buffer: Buffer): Promise<TextSegment[]> {
   const { default: pdfParse } = await import('pdf-parse/lib/pdf-parse.js');
   const pages: string[] = [];
   await pdfParse(buffer, {
+    max: INGESTION_LIMITS.maxPdfPages,
     pagerender: async (pageData: any) => {
       const content = await pageData.getTextContent();
       let lastY: number | undefined;
