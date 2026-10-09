@@ -64,7 +64,7 @@ export function SourcesPanel({ notebookId, readOnly }: { notebookId: string; rea
             />
           </div>
           <button type="button" className="btn btn-small justify-center" onClick={() => setPasting(true)}>
-            <ClipboardPaste size={14} /> Pegar texto
+            <ClipboardPaste size={14} /> Agregar fuente
           </button>
           <ErrorBanner error={upload.error} />
         </div>
@@ -174,7 +174,7 @@ function PasteTextModal({ notebookId, onClose }: { notebookId: string; onClose: 
     >
       <label className="field">
         <span className="field-label">Título</span>
-        <input className="input" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Notas de la llamada" />
+        <input className="input" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej: Minuta de la reunión" />
       </label>
       <label className="field">
         <span className="field-label">Contenido</span>
