@@ -1,0 +1,99 @@
+{
+  "project": {
+    "code": "P-2025-03",
+    "name": "Biblioteca de archivos",
+    "client": "Estudio Jurídico Norte",
+    "industry": "Legal",
+    "year": 2025,
+    "summary": "Repositorio interno con login, carpetas, subida de PDF/DOCX/imagenes a S3, preview y permisos por rol. El OCR de expedientes quedó fuera."
+  },
+  "parameters": {
+    "pmOverheadPct": 15,
+    "contingencyPct": 10
+  },
+  "team": [
+    { "role": "PM", "seniority": "SSR", "count": 1, "dedication": "PT" },
+    { "role": "UX", "seniority": "SR", "count": 1, "dedication": "PT" },
+    { "role": "FRONTEND", "seniority": "SSR", "count": 1, "dedication": "FT" },
+    { "role": "BACKEND", "seniority": "SSR", "count": 1, "dedication": "FT" },
+    { "role": "QA", "seniority": "SSR", "count": 1, "dedication": "PT" }
+  ],
+  "modules": [
+    {
+      "name": "Autenticación y gestión de usuarios",
+      "description": "Login, recuperación de clave, roles abogado/asistente/admin, invitaciones al estudio y baja de usuarios.",
+      "complexity": "MEDIUM",
+      "estimatedHours": { "UX": 12, "FRONTEND": 32, "BACKEND": 40, "QA": 16 },
+      "actualHours": { "UX": 12, "FRONTEND": 30, "BACKEND": 44, "QA": 16 },
+      "notes": "Casi en línea. Invitaciones por email pidieron un flujo extra de aceptación.",
+      "container": "api",
+      "integrations": ["email"],
+      "dependsOn": []
+    },
+    {
+      "name": "Carga y almacenamiento de archivos",
+      "description": "Upload multipart, validación de tipo/tamaño, virus scan básico, almacenamiento en S3 y registro de versión.",
+      "complexity": "HIGH",
+      "estimatedHours": { "UX": 8, "FRONTEND": 40, "BACKEND": 80, "QA": 24 },
+      "actualHours": { "UX": 8, "FRONTEND": 48, "BACKEND": 112, "QA": 32 },
+      "notes": "S3: URLs prefirmadas, CORS y archivos >100 MB. El cliente pidió versionado que no estaba en el brief.",
+      "container": "api",
+      "integrations": ["s3"],
+      "dependsOn": ["Autenticación y gestión de usuarios"]
+    },
+    {
+      "name": "Explorador de archivos y carpetas",
+      "description": "Árbol de carpetas, búsqueda por nombre, mover/renombrar, breadcrumb y vaciado de papelera.",
+      "complexity": "MEDIUM",
+      "estimatedHours": { "UX": 20, "FRONTEND": 56, "BACKEND": 40, "QA": 20 },
+      "actualHours": { "UX": 24, "FRONTEND": 72, "BACKEND": 48, "QA": 24 },
+      "notes": "UX pidió drag & drop entre carpetas a mitad de proyecto.",
+      "container": "web",
+      "integrations": [],
+      "dependsOn": ["Carga y almacenamiento de archivos"]
+    },
+    {
+      "name": "Preview y metadatos",
+      "description": "Vista previa PDF/imágenes, metadatos (expediente, cliente, etiquetas) y descarga.",
+      "complexity": "MEDIUM",
+      "estimatedHours": { "UX": 12, "FRONTEND": 40, "BACKEND": 24, "QA": 16 },
+      "actualHours": { "UX": 12, "FRONTEND": 36, "BACKEND": 28, "QA": 14 },
+      "notes": "Preview de PDF más simple con visor embebido. DOCX solo descarga, no preview.",
+      "container": "web",
+      "integrations": ["s3"],
+      "dependsOn": ["Carga y almacenamiento de archivos"]
+    },
+    {
+      "name": "Permisos y compartir",
+      "description": "ACL por carpeta (ver/editar), links internos y auditoría de accesos.",
+      "complexity": "HIGH",
+      "estimatedHours": { "UX": 12, "FRONTEND": 32, "BACKEND": 64, "QA": 24 },
+      "actualHours": { "UX": 16, "FRONTEND": 40, "BACKEND": 88, "QA": 28 },
+      "notes": "Herencia de permisos padre→hijo más compleja. Auditoría se pidió en UAT.",
+      "container": "api",
+      "integrations": [],
+      "dependsOn": ["Autenticación y gestión de usuarios", "Explorador de archivos y carpetas"]
+    }
+  ],
+  "lessons": [
+    "Uploads a S3 con versionado y archivos grandes se desvían ~40 % si no se cierra el contrato de storage en la propuesta.",
+    "Autenticación y gestión de usuarios otra vez cerró cerca: sirve de ancla para calibrar login en proyectos web.",
+    "Permisos heredados por carpeta son HIGH de verdad: no estimarlos como un ABM de roles.",
+    "El explorador se desvía por interacción (drag & drop, papelera), no por el modelo de datos."
+  ],
+  "architecture": {
+    "actors": [
+      { "key": "abogado", "name": "Abogado", "description": "Consulta y carga expedientes", "uses": ["web"] },
+      { "key": "admin", "name": "Admin del estudio", "description": "Usuarios y permisos", "uses": ["web"] }
+    ],
+    "containers": [
+      { "key": "web", "name": "Aplicación web", "technology": "React", "kind": "WEB", "description": "Explorador y preview", "calls": ["api"] },
+      { "key": "api", "name": "API", "technology": "NestJS", "kind": "API", "description": "Auth, archivos y ACL", "calls": ["db"] },
+      { "key": "db", "name": "Base de datos", "technology": "PostgreSQL", "kind": "DATABASE", "description": "Metadatos y permisos", "calls": [] }
+    ],
+    "externalSystems": [
+      { "key": "s3", "name": "Amazon S3", "description": "Binarios y URLs prefirmadas" },
+      { "key": "email", "name": "Email transaccional", "description": "Invitaciones y recuperación de clave" }
+    ]
+  }
+}

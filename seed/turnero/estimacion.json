@@ -1,0 +1,98 @@
+{
+  "project": {
+    "code": "P-2024-11",
+    "name": "Turnero clínico",
+    "client": "Clínica del Parque",
+    "industry": "Salud",
+    "year": 2024,
+    "summary": "Web para pacientes y profesionales: login, agenda por especialidad y reserva/cancelación de turnos. Incluyó panel admin y notificaciones por email. WhatsApp quedó fuera de alcance."
+  },
+  "parameters": {
+    "pmOverheadPct": 15,
+    "contingencyPct": 10
+  },
+  "team": [
+    { "role": "PM", "seniority": "SSR", "count": 1, "dedication": "PT" },
+    { "role": "UX", "seniority": "SSR", "count": 1, "dedication": "PT" },
+    { "role": "FRONTEND", "seniority": "SSR", "count": 1, "dedication": "FT" },
+    { "role": "BACKEND", "seniority": "SR", "count": 1, "dedication": "FT" },
+    { "role": "QA", "seniority": "JR", "count": 1, "dedication": "PT" }
+  ],
+  "modules": [
+    {
+      "name": "Autenticación y gestión de usuarios",
+      "description": "Login email/password, recuperación de clave, roles paciente/profesional/admin, sesión JWT y ABM de usuarios del staff.",
+      "complexity": "MEDIUM",
+      "estimatedHours": { "UX": 16, "FRONTEND": 40, "BACKEND": 48, "QA": 20 },
+      "actualHours": { "UX": 14, "FRONTEND": 38, "BACKEND": 56, "QA": 22 },
+      "notes": "Backend se desvió por política de contraseñas y bloqueo por intentos que no estaban en el brief.",
+      "container": "api",
+      "integrations": [],
+      "dependsOn": []
+    },
+    {
+      "name": "Agenda y disponibilidad",
+      "description": "Calendario semanal del profesional, slots, excepciones (feriados/vacaciones) y consulta de disponibilidad por especialidad.",
+      "complexity": "HIGH",
+      "estimatedHours": { "UX": 24, "FRONTEND": 64, "BACKEND": 72, "QA": 28 },
+      "actualHours": { "UX": 28, "FRONTEND": 80, "BACKEND": 96, "QA": 36 },
+      "notes": "Reglas de superposición y husos horarios. El cliente cambió la grilla de 30 a 20 minutos a mitad de sprint.",
+      "container": "api",
+      "integrations": [],
+      "dependsOn": ["Autenticación y gestión de usuarios"]
+    },
+    {
+      "name": "Reserva y cancelación de turnos",
+      "description": "Alta de turno, cancelación con antelación mínima, lista de espera simple y vista historial del paciente.",
+      "complexity": "MEDIUM",
+      "estimatedHours": { "UX": 16, "FRONTEND": 48, "BACKEND": 56, "QA": 24 },
+      "actualHours": { "UX": 16, "FRONTEND": 52, "BACKEND": 60, "QA": 26 },
+      "notes": "Desvío chico: validar doble reserva del mismo paciente en el mismo horario.",
+      "container": "api",
+      "integrations": [],
+      "dependsOn": ["Agenda y disponibilidad"]
+    },
+    {
+      "name": "Notificaciones por email",
+      "description": "Confirmación, recordatorio 24 h y aviso de cancelación. Templates HTML y cola de envío.",
+      "complexity": "LOW",
+      "estimatedHours": { "UX": 8, "FRONTEND": 8, "BACKEND": 32, "QA": 12 },
+      "actualHours": { "UX": 6, "FRONTEND": 8, "BACKEND": 28, "QA": 10 },
+      "notes": "Más simple de lo estimado: usaron un proveedor transaccional ya conocido.",
+      "container": "api",
+      "integrations": ["email"],
+      "dependsOn": ["Reserva y cancelación de turnos"]
+    },
+    {
+      "name": "Panel de administración",
+      "description": "ABM de especialidades y profesionales, reportes de occupancy y exportación CSV de turnos.",
+      "complexity": "MEDIUM",
+      "estimatedHours": { "UX": 12, "FRONTEND": 40, "BACKEND": 24, "QA": 16 },
+      "actualHours": { "UX": 12, "FRONTEND": 44, "BACKEND": 28, "QA": 16 },
+      "notes": "CSV pidió columnas extra (obra social) no contempladas.",
+      "container": "web",
+      "integrations": [],
+      "dependsOn": ["Autenticación y gestión de usuarios"]
+    }
+  ],
+  "lessons": [
+    "Las reglas de agenda (grilla, feriados, no superposición) se desvían ~30 % si el cliente no cierra el modelo de turnos en kickoff.",
+    "Login con roles suele cerrar cerca de lo estimado; el desvío aparece en políticas de seguridad pedidas tarde.",
+    "Notificaciones email con un proveedor conocido no necesitan tanta contingencia; WhatsApp sí, y acá se dejó afuera a propósito."
+  ],
+  "architecture": {
+    "actors": [
+      { "key": "paciente", "name": "Paciente", "description": "Reserva y cancela turnos", "uses": ["web"] },
+      { "key": "profesional", "name": "Profesional", "description": "Gestiona su agenda", "uses": ["web"] },
+      { "key": "admin", "name": "Administrativo", "description": "Configura especialidades y reportes", "uses": ["web"] }
+    ],
+    "containers": [
+      { "key": "web", "name": "Aplicación web", "technology": "React", "kind": "WEB", "description": "Front pacientes y staff", "calls": ["api"] },
+      { "key": "api", "name": "API", "technology": "NestJS", "kind": "API", "description": "Turnos, auth y notificaciones", "calls": ["db"] },
+      { "key": "db", "name": "Base de datos", "technology": "PostgreSQL", "kind": "DATABASE", "description": "Usuarios, agendas y turnos", "calls": [] }
+    ],
+    "externalSystems": [
+      { "key": "email", "name": "Proveedor de email transaccional", "description": "Envío de confirmaciones y recordatorios" }
+    ]
+  }
+}

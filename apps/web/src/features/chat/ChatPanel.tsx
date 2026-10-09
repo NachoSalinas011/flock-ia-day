@@ -71,7 +71,7 @@ export function ChatPanel({ notebookId, draft: incomingDraft, onDraftConsumed }:
           {messages?.map((m) => <Message key={m.id} message={m} onCitation={setCitation} />)}
           {send.isPending && (
             <div className="card self-start px-4 py-3">
-              <Spinner label="Leyendo las fuentes y pensando… (los modelos free pueden tardar ~30 s)" />
+              <Spinner label="Leyendo las fuentes y pensando…" />
             </div>
           )}
           <ErrorBanner error={send.error} />
