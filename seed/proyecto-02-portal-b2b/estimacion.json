@@ -1,0 +1,415 @@
+{
+  "project": {
+    "code": "P-2025-03",
+    "name": "Portal B2B Mayorista",
+    "client": "Distribuidora Andina S.A.",
+    "industry": "Retail / Distribución",
+    "year": 2025,
+    "status": "CLOSED",
+    "stack": [
+      "React",
+      "TypeScript",
+      "NestJS",
+      "PostgreSQL",
+      "AWS"
+    ],
+    "summary": "Portal de autogestión de pedidos para clientes mayoristas (comercios), con catálogo y listas de precios por cliente, checkout con cuenta corriente y pago online, integración bidireccional con el ERP y backoffice comercial."
+  },
+  "parameters": {
+    "hoursUnit": "SSR_EQUIVALENT",
+    "seniorityFactors": {
+      "JR": 1.3,
+      "SSR": 1.0,
+      "SR": 0.8
+    },
+    "pmOverheadPct": 15,
+    "contingencyPct": 10
+  },
+  "team": [
+    {
+      "role": "PM",
+      "seniority": "SR",
+      "count": 1,
+      "dedication": "PT"
+    },
+    {
+      "role": "UX",
+      "seniority": "SSR",
+      "count": 1,
+      "dedication": "PT"
+    },
+    {
+      "role": "FRONTEND",
+      "seniority": "SSR",
+      "count": 1,
+      "dedication": "FT"
+    },
+    {
+      "role": "FRONTEND",
+      "seniority": "JR",
+      "count": 1,
+      "dedication": "PT"
+    },
+    {
+      "role": "BACKEND",
+      "seniority": "SR",
+      "count": 1,
+      "dedication": "FT"
+    },
+    {
+      "role": "BACKEND",
+      "seniority": "SSR",
+      "count": 1,
+      "dedication": "FT"
+    },
+    {
+      "role": "QA",
+      "seniority": "JR",
+      "count": 1,
+      "dedication": "FT"
+    }
+  ],
+  "modules": [
+    {
+      "name": "Autenticación y gestión de usuarios",
+      "description": "Login de clientes empresa con multiusuario (comprador y administrador de la cuenta), vendedores internos y administradores; roles y permisos; invitación de usuarios.",
+      "complexity": "MEDIUM",
+      "estimatedHours": {
+        "UX": 12,
+        "FRONTEND": 32,
+        "BACKEND": 44,
+        "QA": 16
+      },
+      "actualHours": {
+        "UX": 12,
+        "FRONTEND": 30,
+        "BACKEND": 46,
+        "QA": 16
+      },
+      "notes": "Se estimó usando TurnoFácil como referencia (100 h) más el multiusuario por empresa. Quedó dentro de lo estimado.",
+      "container": "api",
+      "integrations": [],
+      "dependsOn": []
+    },
+    {
+      "name": "Catálogo de productos y listas de precios",
+      "description": "Catálogo con búsqueda y filtros, ~8.000 SKUs, listas de precios y descuentos por cliente, stock visible por depósito.",
+      "complexity": "HIGH",
+      "estimatedHours": {
+        "UX": 24,
+        "FRONTEND": 64,
+        "BACKEND": 72,
+        "QA": 32
+      },
+      "actualHours": {
+        "UX": 22,
+        "FRONTEND": 70,
+        "BACKEND": 76,
+        "QA": 30
+      },
+      "notes": "Dentro de lo estimado. La búsqueda se resolvió con full-text search de PostgreSQL.",
+      "container": "portal",
+      "integrations": [],
+      "dependsOn": [
+        "Autenticación y gestión de usuarios",
+        "Integración con ERP"
+      ]
+    },
+    {
+      "name": "Carrito y checkout de pedidos",
+      "description": "Carrito persistente, pedido mínimo por cliente, repetir pedido anterior, selección de forma de pago (cuenta corriente u online) y fecha de entrega.",
+      "complexity": "HIGH",
+      "estimatedHours": {
+        "UX": 24,
+        "FRONTEND": 72,
+        "BACKEND": 64,
+        "QA": 32
+      },
+      "actualHours": {
+        "UX": 26,
+        "FRONTEND": 74,
+        "BACKEND": 66,
+        "QA": 34
+      },
+      "notes": "Dentro de lo estimado.",
+      "container": "portal",
+      "integrations": [],
+      "dependsOn": [
+        "Catálogo de productos y listas de precios"
+      ]
+    },
+    {
+      "name": "Integración con ERP",
+      "description": "Sincronización de productos, stock y precios desde el ERP (cada 15 min) y envío de pedidos confirmados al ERP. El ERP expone servicios SOAP legacy.",
+      "complexity": "HIGH",
+      "estimatedHours": {
+        "UX": 0,
+        "FRONTEND": 0,
+        "BACKEND": 120,
+        "QA": 32
+      },
+      "actualHours": {
+        "UX": 0,
+        "FRONTEND": 0,
+        "BACKEND": 168,
+        "QA": 44
+      },
+      "notes": "+39 %. Los servicios SOAP estaban mal documentados, el ambiente de testing del ERP no estaba disponible al inicio y hubo inconsistencias de códigos de producto que obligaron a desarrollar una tabla de mapeo.",
+      "container": "sync",
+      "integrations": [
+        "erp"
+      ],
+      "dependsOn": []
+    },
+    {
+      "name": "Pagos online y cuenta corriente",
+      "description": "Integración con pasarela de pagos (tarjeta y transferencia), consulta de saldo y comprobantes de cuenta corriente desde el ERP.",
+      "complexity": "MEDIUM",
+      "estimatedHours": {
+        "UX": 8,
+        "FRONTEND": 24,
+        "BACKEND": 56,
+        "QA": 20
+      },
+      "actualHours": {
+        "UX": 8,
+        "FRONTEND": 22,
+        "BACKEND": 60,
+        "QA": 22
+      },
+      "notes": "Dentro de lo estimado: la pasarela tenía SDK y sandbox bien documentados.",
+      "container": "api",
+      "integrations": [
+        "pagos",
+        "erp"
+      ],
+      "dependsOn": [
+        "Carrito y checkout de pedidos"
+      ]
+    },
+    {
+      "name": "Notificaciones (email)",
+      "description": "Emails transaccionales: confirmación de pedido, cambio de estado, invitación de usuarios.",
+      "complexity": "LOW",
+      "estimatedHours": {
+        "UX": 4,
+        "FRONTEND": 8,
+        "BACKEND": 24,
+        "QA": 8
+      },
+      "actualHours": {
+        "UX": 4,
+        "FRONTEND": 8,
+        "BACKEND": 22,
+        "QA": 8
+      },
+      "notes": "Solo email, sin WhatsApp: mucho más simple que en TurnoFácil.",
+      "container": "api",
+      "integrations": [
+        "email"
+      ],
+      "dependsOn": [
+        "Carrito y checkout de pedidos"
+      ]
+    },
+    {
+      "name": "Backoffice administrativo",
+      "description": "Gestión de clientes, usuarios, pedidos y estados, banners y destacados del catálogo, parámetros comerciales (pedido mínimo, zonas de entrega).",
+      "complexity": "MEDIUM",
+      "estimatedHours": {
+        "UX": 20,
+        "FRONTEND": 56,
+        "BACKEND": 48,
+        "QA": 24
+      },
+      "actualHours": {
+        "UX": 18,
+        "FRONTEND": 52,
+        "BACKEND": 46,
+        "QA": 22
+      },
+      "notes": "Dentro de lo estimado. Se reutilizaron componentes del backoffice de TurnoFácil.",
+      "container": "backoffice",
+      "integrations": [],
+      "dependsOn": [
+        "Autenticación y gestión de usuarios"
+      ]
+    },
+    {
+      "name": "Reportes y dashboard de ventas",
+      "description": "Ventas por cliente, vendedor y categoría; productos más pedidos; exportación a Excel.",
+      "complexity": "MEDIUM",
+      "estimatedHours": {
+        "UX": 12,
+        "FRONTEND": 40,
+        "BACKEND": 32,
+        "QA": 16
+      },
+      "actualHours": {
+        "UX": 12,
+        "FRONTEND": 44,
+        "BACKEND": 36,
+        "QA": 16
+      },
+      "notes": "Levemente por encima: el cliente pidió filtros adicionales.",
+      "container": "backoffice",
+      "integrations": [],
+      "dependsOn": [
+        "Carrito y checkout de pedidos"
+      ]
+    },
+    {
+      "name": "Infraestructura y despliegue",
+      "description": "Staging y producción en AWS, CI/CD, monitoreo y alertas de la sincronización con el ERP.",
+      "complexity": "LOW",
+      "estimatedHours": {
+        "UX": 0,
+        "FRONTEND": 0,
+        "BACKEND": 32,
+        "QA": 0
+      },
+      "actualHours": {
+        "UX": 0,
+        "FRONTEND": 0,
+        "BACKEND": 28,
+        "QA": 0
+      },
+      "notes": "Se reutilizaron los pipelines de TurnoFácil.",
+      "container": "api",
+      "integrations": [],
+      "dependsOn": []
+    }
+  ],
+  "summary": {
+    "estimated": {
+      "byRole": {
+        "UX": 104,
+        "FRONTEND": 296,
+        "BACKEND": 492,
+        "QA": 180,
+        "PM": 161
+      },
+      "devHours": 1072,
+      "pmHours": 161,
+      "contingencyHours": 123,
+      "totalHours": 1356,
+      "durationBusinessDays": 33
+    },
+    "actual": {
+      "byRole": {
+        "UX": 102,
+        "FRONTEND": 300,
+        "BACKEND": 548,
+        "QA": 192,
+        "PM": 165
+      },
+      "devHours": 1142,
+      "pmHours": 165,
+      "totalHours": 1307,
+      "durationBusinessDays": 32
+    },
+    "deviationPct": -3.6
+  },
+  "lessons": [
+    "Las integraciones con sistemas legacy (SOAP, sin documentación ni ambiente de testing) tuvieron un desvío del ~39 %, en línea con WhatsApp en TurnoFácil (+37 %). Factor recomendado: 1,4 sobre backend y QA del módulo.",
+    "El 10 % de contingencia absorbió por completo el desvío de la integración con el ERP: mantenerlo como default.",
+    "Reutilizar autenticación, backoffice y pipelines de proyectos anteriores mantuvo esos módulos dentro de lo estimado.",
+    "Pasarelas de pago con SDK y sandbox maduros no requieren factor de riesgo adicional.",
+    "Pedir acceso al ambiente de testing de los sistemas del cliente como condición previa al inicio (supuesto en la propuesta)."
+  ],
+  "architecture": {
+    "actors": [
+      {
+        "key": "comercio",
+        "name": "Comercio cliente",
+        "description": "Compra con su lista de precios y paga online o a cuenta corriente",
+        "uses": [
+          "portal"
+        ]
+      },
+      {
+        "key": "vendedor",
+        "name": "Vendedor",
+        "description": "Carga pedidos en nombre de sus clientes",
+        "uses": [
+          "portal"
+        ]
+      },
+      {
+        "key": "admin",
+        "name": "Administración comercial",
+        "description": "Gestiona clientes, pedidos y parámetros",
+        "uses": [
+          "backoffice"
+        ]
+      }
+    ],
+    "containers": [
+      {
+        "key": "portal",
+        "name": "Portal B2B",
+        "technology": "React",
+        "kind": "WEB",
+        "description": "Catálogo, carrito y checkout",
+        "calls": [
+          "api"
+        ]
+      },
+      {
+        "key": "backoffice",
+        "name": "Backoffice comercial",
+        "technology": "React",
+        "kind": "WEB",
+        "description": "Gestión comercial y reportes",
+        "calls": [
+          "api"
+        ]
+      },
+      {
+        "key": "api",
+        "name": "API del portal",
+        "technology": "NestJS",
+        "kind": "API",
+        "description": "Pedidos, precios y pagos",
+        "calls": [
+          "db"
+        ]
+      },
+      {
+        "key": "sync",
+        "name": "Worker de sincronización",
+        "technology": "NestJS (cron cada 15 min)",
+        "kind": "WORKER",
+        "description": "Sincroniza stock, precios y pedidos con el ERP",
+        "calls": [
+          "db"
+        ]
+      },
+      {
+        "key": "db",
+        "name": "Base de datos",
+        "technology": "PostgreSQL",
+        "kind": "DATABASE",
+        "description": "Catálogo, pedidos y clientes",
+        "calls": []
+      }
+    ],
+    "externalSystems": [
+      {
+        "key": "erp",
+        "name": "ERP (servicios SOAP)",
+        "description": "Sistema legacy de stock, precios y facturación"
+      },
+      {
+        "key": "pagos",
+        "name": "Pasarela de pagos",
+        "description": "Tarjeta y transferencia"
+      },
+      {
+        "key": "email",
+        "name": "Servicio de email",
+        "description": "Emails transaccionales"
+      }
+    ]
+  }
+}

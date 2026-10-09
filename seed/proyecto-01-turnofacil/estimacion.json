@@ -1,0 +1,345 @@
+{
+  "project": {
+    "code": "P-2024-07",
+    "name": "TurnoFácil",
+    "client": "Red de Clínicas Del Valle",
+    "industry": "Salud",
+    "year": 2024,
+    "status": "CLOSED",
+    "stack": [
+      "React",
+      "TypeScript",
+      "NestJS",
+      "PostgreSQL",
+      "AWS"
+    ],
+    "summary": "Plataforma web responsive para reserva de turnos médicos online en 4 sedes, con backoffice administrativo, recordatorios por email y WhatsApp, y reportes de ocupación."
+  },
+  "parameters": {
+    "hoursUnit": "SSR_EQUIVALENT",
+    "seniorityFactors": {
+      "JR": 1.3,
+      "SSR": 1.0,
+      "SR": 0.8
+    },
+    "pmOverheadPct": 15,
+    "contingencyPct": 0
+  },
+  "team": [
+    {
+      "role": "PM",
+      "seniority": "SSR",
+      "count": 1,
+      "dedication": "PT"
+    },
+    {
+      "role": "UX",
+      "seniority": "SSR",
+      "count": 1,
+      "dedication": "PT"
+    },
+    {
+      "role": "FRONTEND",
+      "seniority": "SSR",
+      "count": 1,
+      "dedication": "FT"
+    },
+    {
+      "role": "BACKEND",
+      "seniority": "SR",
+      "count": 1,
+      "dedication": "FT"
+    },
+    {
+      "role": "QA",
+      "seniority": "SSR",
+      "count": 1,
+      "dedication": "PT"
+    }
+  ],
+  "modules": [
+    {
+      "name": "Autenticación y gestión de usuarios",
+      "description": "Registro y login de pacientes (email + Google), login de profesionales y administradores, roles y permisos, recupero de contraseña.",
+      "complexity": "MEDIUM",
+      "estimatedHours": {
+        "UX": 12,
+        "FRONTEND": 32,
+        "BACKEND": 40,
+        "QA": 16
+      },
+      "actualHours": {
+        "UX": 12,
+        "FRONTEND": 30,
+        "BACKEND": 44,
+        "QA": 14
+      },
+      "notes": "Dentro de lo estimado.",
+      "container": "api",
+      "integrations": [
+        "google"
+      ],
+      "dependsOn": []
+    },
+    {
+      "name": "Agenda y reserva de turnos",
+      "description": "Disponibilidad por profesional, sede y especialidad; reserva, cancelación y reprogramación; sobreturnos; bloqueo de agenda por licencias; control de concurrencia sobre el mismo slot.",
+      "complexity": "HIGH",
+      "estimatedHours": {
+        "UX": 32,
+        "FRONTEND": 80,
+        "BACKEND": 96,
+        "QA": 40
+      },
+      "actualHours": {
+        "UX": 36,
+        "FRONTEND": 96,
+        "BACKEND": 128,
+        "QA": 52
+      },
+      "notes": "+26 %. Las reglas de sobreturnos y licencias aparecieron a mitad del proyecto, y la concurrencia sobre slots requirió locking optimista y más pruebas.",
+      "container": "api",
+      "integrations": [],
+      "dependsOn": [
+        "Autenticación y gestión de usuarios"
+      ]
+    },
+    {
+      "name": "Gestión de pacientes",
+      "description": "Ficha del paciente, cobertura médica, historial de turnos y asistencia (ausentismo).",
+      "complexity": "MEDIUM",
+      "estimatedHours": {
+        "UX": 16,
+        "FRONTEND": 40,
+        "BACKEND": 40,
+        "QA": 20
+      },
+      "actualHours": {
+        "UX": 14,
+        "FRONTEND": 38,
+        "BACKEND": 42,
+        "QA": 18
+      },
+      "notes": "Dentro de lo estimado.",
+      "container": "web",
+      "integrations": [],
+      "dependsOn": [
+        "Autenticación y gestión de usuarios"
+      ]
+    },
+    {
+      "name": "Notificaciones (email y WhatsApp)",
+      "description": "Confirmación de turno y recordatorio 24 h antes por email y WhatsApp Business API; respuesta del paciente para confirmar o cancelar.",
+      "complexity": "MEDIUM",
+      "estimatedHours": {
+        "UX": 4,
+        "FRONTEND": 8,
+        "BACKEND": 48,
+        "QA": 16
+      },
+      "actualHours": {
+        "UX": 4,
+        "FRONTEND": 8,
+        "BACKEND": 72,
+        "QA": 20
+      },
+      "notes": "+37 %. Hubo demoras en la aprobación de plantillas de WhatsApp Business, el webhook de respuestas fue más complejo de lo previsto y faltaba un sandbox real del proveedor.",
+      "container": "api",
+      "integrations": [
+        "whatsapp",
+        "email"
+      ],
+      "dependsOn": [
+        "Agenda y reserva de turnos"
+      ]
+    },
+    {
+      "name": "Backoffice administrativo",
+      "description": "ABM de sedes, profesionales, especialidades, coberturas y horarios de atención; gestión de usuarios internos.",
+      "complexity": "MEDIUM",
+      "estimatedHours": {
+        "UX": 20,
+        "FRONTEND": 56,
+        "BACKEND": 48,
+        "QA": 24
+      },
+      "actualHours": {
+        "UX": 18,
+        "FRONTEND": 60,
+        "BACKEND": 50,
+        "QA": 22
+      },
+      "notes": "Dentro de lo estimado.",
+      "container": "backoffice",
+      "integrations": [],
+      "dependsOn": [
+        "Autenticación y gestión de usuarios"
+      ]
+    },
+    {
+      "name": "Reportes y dashboard",
+      "description": "Dashboard de ocupación por sede y profesional, tasa de ausentismo, exportación a Excel.",
+      "complexity": "LOW",
+      "estimatedHours": {
+        "UX": 12,
+        "FRONTEND": 32,
+        "BACKEND": 24,
+        "QA": 12
+      },
+      "actualHours": {
+        "UX": 10,
+        "FRONTEND": 28,
+        "BACKEND": 22,
+        "QA": 10
+      },
+      "notes": "Por debajo de lo estimado: se usó una librería de gráficos ya conocida.",
+      "container": "backoffice",
+      "integrations": [],
+      "dependsOn": [
+        "Agenda y reserva de turnos"
+      ]
+    },
+    {
+      "name": "Infraestructura y despliegue",
+      "description": "Ambientes de staging y producción en AWS, CI/CD, backups y monitoreo básico.",
+      "complexity": "LOW",
+      "estimatedHours": {
+        "UX": 0,
+        "FRONTEND": 0,
+        "BACKEND": 24,
+        "QA": 0
+      },
+      "actualHours": {
+        "UX": 0,
+        "FRONTEND": 0,
+        "BACKEND": 30,
+        "QA": 0
+      },
+      "notes": "Hubo ajustes de permisos IAM en la cuenta del cliente.",
+      "container": "api",
+      "integrations": [],
+      "dependsOn": []
+    }
+  ],
+  "summary": {
+    "estimated": {
+      "byRole": {
+        "UX": 96,
+        "FRONTEND": 248,
+        "BACKEND": 320,
+        "QA": 128,
+        "PM": 119
+      },
+      "devHours": 792,
+      "pmHours": 119,
+      "contingencyHours": 0,
+      "totalHours": 911,
+      "durationBusinessDays": 32
+    },
+    "actual": {
+      "byRole": {
+        "UX": 94,
+        "FRONTEND": 260,
+        "BACKEND": 388,
+        "QA": 136,
+        "PM": 140
+      },
+      "devHours": 878,
+      "pmHours": 140,
+      "totalHours": 1018,
+      "durationBusinessDays": 39
+    },
+    "deviationPct": 11.7
+  },
+  "lessons": [
+    "Los módulos de agenda o calendario con reglas de disponibilidad deben estimarse como complejidad ALTA y con relevamiento detallado de excepciones (sobreturnos, licencias, feriados).",
+    "Las integraciones con APIs de terceros que requieren aprobación externa (WhatsApp Business) tuvieron un desvío del ~37 %: aplicar un factor de 1,4 al backend y agregar dependencias externas como riesgo.",
+    "No incluir contingencia hizo que el desvío impactara directo en el plazo (+7 días hábiles). Incluir al menos un 10 %.",
+    "Autenticación, backoffice ABM y reportes simples se estimaron con precisión: son módulos de referencia confiables."
+  ],
+  "architecture": {
+    "actors": [
+      {
+        "key": "paciente",
+        "name": "Paciente",
+        "description": "Reserva, cancela y reprograma turnos",
+        "uses": [
+          "web"
+        ]
+      },
+      {
+        "key": "profesional",
+        "name": "Profesional",
+        "description": "Consulta su agenda del día",
+        "uses": [
+          "web"
+        ]
+      },
+      {
+        "key": "administrativo",
+        "name": "Administrativo de sede",
+        "description": "Gestiona sedes, profesionales y horarios",
+        "uses": [
+          "backoffice"
+        ]
+      }
+    ],
+    "containers": [
+      {
+        "key": "web",
+        "name": "Web de turnos",
+        "technology": "React (responsive)",
+        "kind": "WEB",
+        "description": "Portal de pacientes y profesionales",
+        "calls": [
+          "api"
+        ]
+      },
+      {
+        "key": "backoffice",
+        "name": "Backoffice",
+        "technology": "React",
+        "kind": "WEB",
+        "description": "Administración y reportes",
+        "calls": [
+          "api"
+        ]
+      },
+      {
+        "key": "api",
+        "name": "API de turnos",
+        "technology": "NestJS",
+        "kind": "API",
+        "description": "Reglas de agenda, reservas y notificaciones",
+        "calls": [
+          "db"
+        ]
+      },
+      {
+        "key": "db",
+        "name": "Base de datos",
+        "technology": "PostgreSQL (AWS RDS)",
+        "kind": "DATABASE",
+        "description": "Turnos, pacientes y configuración",
+        "calls": []
+      }
+    ],
+    "externalSystems": [
+      {
+        "key": "whatsapp",
+        "name": "WhatsApp Business API",
+        "description": "Recordatorios y confirmación de turnos"
+      },
+      {
+        "key": "email",
+        "name": "Servicio de email",
+        "description": "Emails transaccionales"
+      },
+      {
+        "key": "google",
+        "name": "Google Sign-In",
+        "description": "Login social de pacientes"
+      }
+    ]
+  }
+}

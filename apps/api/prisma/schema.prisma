@@ -1,0 +1,242 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+enum NotebookStatus {
+  ACTIVE
+  CLOSED
+}
+
+enum SourceType {
+  TEXT
+  MARKDOWN
+  PDF
+  DOCX
+  VIDEO
+}
+
+enum SourceStatus {
+  PENDING
+  PROCESSING
+  READY
+  ERROR
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+}
+
+enum Role {
+  PM
+  UX
+  FRONTEND
+  BACKEND
+  QA
+}
+
+enum Seniority {
+  JR
+  SSR
+  SR
+}
+
+enum Dedication {
+  FT
+  PT
+}
+
+enum Level {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Notebook {
+  id          String         @id @default(uuid())
+  name        String
+  client      String?
+  industry    String?
+  code        String?        @unique
+  year        Int?
+  status      NotebookStatus @default(ACTIVE)
+  description String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  sources   Source[]
+  chunks    Chunk[]
+  messages  ChatMessage[]
+  proposals Proposal[]
+
+  @@index([status])
+}
+
+model Source {
+  id           String       @id @default(uuid())
+  notebookId   String
+  notebook     Notebook     @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+  type         SourceType
+  filename     String
+  status       SourceStatus @default(PENDING)
+  errorMessage String?
+  rawText      String?
+  createdAt    DateTime     @default(now())
+
+  chunks Chunk[]
+
+  @@index([notebookId])
+}
+
+model Chunk {
+  id         String                      @id @default(uuid())
+  sourceId   String
+  source     Source                      @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  notebookId String
+  notebook   Notebook                    @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+  position   Int
+  content    String
+  /// heading, page or timestamp of the chunk, used for citations
+  meta       Json                        @default("{}")
+  embedding  Unsupported("vector(384)")?
+
+  @@index([notebookId])
+  @@index([sourceId])
+}
+
+model ChatMessage {
+  id         String   @id @default(uuid())
+  notebookId String
+  notebook   Notebook @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+  role       ChatRole
+  content    String
+  citations  Json     @default("[]")
+  createdAt  DateTime @default(now())
+
+  @@index([notebookId, createdAt])
+}
+
+enum Tier {
+  MVP
+  BALANCED
+  COMPLETE
+}
+
+enum Priority {
+  MUST
+  SHOULD
+  COULD
+}
+
+enum ScopeVariant {
+  FULL
+  REDUCED
+}
+
+/// One generation for an opportunity: the module catalog plus three scope options.
+model Proposal {
+  id            String    @id @default(uuid())
+  notebookId    String
+  notebook      Notebook  @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+  version       Int
+  summary       String
+  assumptions   String[]
+  outOfScope    String[]
+  risks         String[]
+  openQuestions String[]
+  lessons       String[]
+  model         String?
+  /// C4 level 2: { actors, containers, externalSystems }
+  architecture  Json?
+  /// deadline the BALANCED option is fitted to
+  targetDate    DateTime?
+  /// where the deadline comes from (quote of the sources, or "estimada")
+  targetSource  String?
+  createdAt     DateTime  @default(now())
+
+  modules ProposalModule[]
+  options ProposalOption[]
+
+  @@unique([notebookId, version])
+}
+
+model ProposalModule {
+  id                 String   @id @default(uuid())
+  proposalId         String
+  proposal           Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  position           Int
+  name               String
+  description        String
+  complexity         Level
+  confidence         Level    @default(MEDIUM)
+  priority           Priority @default(MUST)
+  /// { UX, FRONTEND, BACKEND, QA } in SSR-equivalent hours (full scope)
+  estimatedHours     Json
+  /// simplified scope usable by MVP/BALANCED; null when the module can't be reduced
+  reducedDescription String?
+  reducedHours       Json?
+  /// same shape as estimatedHours, only for closed projects
+  actualHours        Json?
+  /// [{ project, module, estimatedHours, actualHours }]
+  analogies          Json     @default("[]")
+  sourceChunkIds     String[]
+  notes              String?
+  /// key of the C4 container that mainly hosts the module
+  containerKey       String?
+  /// keys of the external systems the module integrates with
+  integrations       String[]
+  /// names of the modules this one depends on
+  dependsOn          String[]
+
+  optionLinks ProposalOptionModule[]
+
+  @@index([proposalId])
+}
+
+/// A scope alternative offered to the client (MVP, Equilibrada, Completa).
+model ProposalOption {
+  id             String   @id @default(uuid())
+  proposalId     String
+  proposal       Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  tier           Tier
+  isFormal       Boolean  @default(false)
+  pmOverheadPct  Int      @default(15)
+  contingencyPct Int      @default(10)
+
+  team    TeamMember[]
+  modules ProposalOptionModule[]
+
+  @@unique([proposalId, tier])
+  @@index([isFormal])
+}
+
+/// Module included in an option, with the variant (full or reduced) it uses.
+model ProposalOptionModule {
+  id       String         @id @default(uuid())
+  optionId String
+  option   ProposalOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  moduleId String
+  module   ProposalModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  variant  ScopeVariant   @default(FULL)
+
+  @@unique([optionId, moduleId])
+}
+
+model TeamMember {
+  id         String         @id @default(uuid())
+  optionId   String
+  option     ProposalOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  role       Role
+  seniority  Seniority
+  count      Int            @default(1)
+  dedication Dedication
+
+  @@index([optionId])
+}
